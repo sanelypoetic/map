@@ -7,7 +7,7 @@ import time
 @st.cache_data
 def load_india_shapefile():
 
-    gdf = gpd.read_file('data/India_States.shp')
+    gdf = gpd.read_file('data/India_State_Boundary.shp')
     return gdf
 
 def draw_map(gdf, correct=None):
