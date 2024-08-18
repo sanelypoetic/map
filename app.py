@@ -158,7 +158,7 @@ def generate_bokeh_game():
 
     # Output the plot to an HTML file
     output_file(GAME_HTML)
-    save(p)  # Save the Bokeh plot as an HTML file
+    save(layout)  # Save the entire layout as an HTML file
 
 # Run the Bokeh game generation every time the Streamlit app is run
 generate_bokeh_game()
@@ -189,14 +189,9 @@ if name:
         # Restart logic, perhaps you want to reload the game or simply refresh the page
         st.experimental_rerun()
 
-    # Optionally, save the score manually
-    if st.button("Save My Time"):
-        # This would be where you capture the final time (you'll need to manage this logic externally)
-        elapsed_time = st.number_input("Enter your time (in seconds):", min_value=0)
-        if elapsed_time > 0:
-            save_time(name, elapsed_time)
-            st.success("Your time has been saved!")
-
-            # Refresh leaderboard after saving time
-            st.subheader("Leaderboard (Updated)")
-            st.text(show_leaderboard())
+    # Automatically save the time after game completion
+    if "start_time" in st.session_state and st.session_state.start_time is not None:
+        elapsed_time = time.time() - st.session_state.start_time
+        save_time(name, elapsed_time)
+        st.success(f"Your time of {elapsed_time:.2f} seconds has been saved!")
+        st.session_state.start_time = None  # Reset for the next game
