@@ -2,3 +2,4 @@ geopandas
 matplotlib
 streamlit
 plotly
+bokeh
