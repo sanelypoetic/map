@@ -1,57 +1,60 @@
 import streamlit as st
-import geopandas as gpd
-import plotly.express as px
+import json
+from bokeh.models import GeoJSONDataSource, HoverTool, TapTool, LinearColorMapper
+from bokeh.plotting import figure
+from bokeh.palettes import Viridis6
+from bokeh.io import show
 import random
-import time
 
 @st.cache_data
-def load_india_shapefile():
-    gdf = gpd.read_file('India_State_Boundary.shp')
-    return gdf
+def load_geojson_data():
+    with open("Indian_States.geojson", "r") as file:
+        geojson_data = json.load(file)
+    return geojson_data
 
-def plot_map(gdf, correct_state=None):
-    fig = px.choropleth(gdf,
-                        geojson=gdf.geometry,
-                        locations=gdf.index,
-                        color=gdf['State_Name'].apply(lambda x: 'Correct' if x == correct_state else 'State/UT'),
-                        hover_name=gdf['State_Name'],
-                        hover_data={'State_Name': False})
-    
-    fig.update_geos(fitbounds="locations", visible=False)
-    fig.update_layout(height=600, margin={"r":0,"t":0,"l":0,"b":0})
-    
-    return fig
+def create_bokeh_plot(geo_source):
+    p = figure(title="India Map", tools="pan,wheel_zoom,reset,tap", width=800, height=800)
+    p.grid.grid_line_color = None
+    p.patches('xs', 'ys', source=geo_source,
+              fill_color={'field': 'Color', 'transform': LinearColorMapper(palette=Viridis6)},
+              line_color='black', line_width=0.5, fill_alpha=0.7)
 
-gdf = load_india_shapefile()
+    hover = HoverTool()
+    hover.tooltips = [("State", "@State_Name")]
+    p.add_tools(hover)
 
-score = 0
-start_time = time.time()
+    return p
 
-states_list = gdf['State_Name'].tolist()
-random.shuffle(states_list)
+def main():
+    geojson_data = load_geojson_data()
 
-for state in states_list:
-    st.write(f"Locate the state/union territory: **{state}**")
-    
-    fig = plot_map(gdf)
-    selected_state = None
-    
-    clicked = st.plotly_chart(fig, use_container_width=True)
-    
-    clicked_state = st.selectbox("Choose the state/UT you clicked on:", gdf['State_Name'].tolist())
-    
-    if clicked_state == state:
-        st.write("Correct!")
-        score += 1
-        fig = plot_map(gdf, correct_state=state)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.write(f"Wrong! You selected {clicked_state} instead of {state}.")
-        fig = plot_map(gdf)
-        st.plotly_chart(fig, use_container_width=True)
+    for feature in geojson_data['features']:
+        feature['properties']['Color'] = 'blue'
 
-end_time = time.time()
-total_time = end_time - start_time
+    geo_source = GeoJSONDataSource(geojson=json.dumps(geojson_data))
+    plot = create_bokeh_plot(geo_source)
 
-st.write(f"Game over! Your score: {score}/{len(states_list)}")
-st.write(f"Time taken: {total_time:.2f} seconds")
+    state_list = [feature['properties']['NAME_1'] for feature in geojson_data['features']]
+    random_state = random.choice(state_list)
+    st.write(f"Find the state/UT: **{random_state}**")
+
+    def callback(event):
+        selected_state = None
+        for feature in geojson_data['features']:
+            if feature['properties']['NAME_1'] == random_state:
+                feature['properties']['Color'] = 'green'
+                selected_state = feature['properties']['NAME_1']
+            else:
+                feature['properties']['Color'] = 'blue'
+
+        geo_source.geojson = json.dumps(geojson_data)
+        if selected_state == random_state:
+            st.success(f"Correct! You found {random_state}.")
+        else:
+            st.error(f"Wrong! You clicked on {selected_state}.")
+
+    plot.on_event(TapTool, callback)
+    st.bokeh_chart(plot)
+
+if __name__ == "__main__":
+    main()
