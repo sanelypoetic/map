@@ -5,21 +5,13 @@ import time
 import pandas as pd
 import streamlit as st
 from bokeh.plotting import figure, output_file, save
-from bokeh.models import GeoJSONDataSource, TapTool, CustomJS
+from bokeh.models import GeoJSONDataSource, TapTool, CustomJS, Div
 from bokeh.layouts import column, row
 from bokeh.palettes import Viridis256
 
 # File paths
 GAME_HTML = "interactive_india_map.html"
 SCORE_FILE = "scores.csv"
-
-# Initialize or reset the game state
-def reset_game():
-    global state_list, random_state, start_time, score
-    state_list = geo_df['NAME_1'].tolist()
-    random_state = random.choice(state_list)
-    start_time = time.time()
-    score = 0
 
 # Function to save time to file
 def save_time(name, time_elapsed):
@@ -46,28 +38,27 @@ def show_leaderboard():
     
     return leaderboard_text
 
-# Load the GeoJSON data
-geojson_file = "Indian_States.geojson"
-with open(geojson_file, "r") as file:
-    geojson_data = json.load(file)
-
-# Assign random colors to all states initially
-for feature in geojson_data['features']:
-    feature['properties']['Color'] = random.choice(Viridis256)
-
-# Create GeoJSONDataSource
-geo_source = GeoJSONDataSource(geojson=json.dumps(geojson_data))
-
-# Define the Bokeh figure
-p = figure(title="India Map", tools="tap", width=800, height=800, x_axis_location=None, y_axis_location=None)
-p.grid.grid_line_color = None
-
-# Create the patches representing the states
-p.patches('xs', 'ys', fill_alpha=0.7, line_color='black', fill_color='Color', line_width=0.5, source=geo_source)
-
 # Function to generate the Bokeh game and save it as an HTML file
 def generate_bokeh_game():
-    global start_time, random_state, state_list
+    global state_list, random_state, start_time
+
+    # Load the GeoJSON data from your local file
+    with open("Indian_States.geojson", "r") as file:
+        geojson_data = json.load(file)
+
+    # Assign random colors to all states initially
+    for feature in geojson_data['features']:
+        feature['properties']['Color'] = random.choice(Viridis256)
+
+    # Create GeoJSONDataSource
+    geo_source = GeoJSONDataSource(geojson=json.dumps(geojson_data))
+
+    # Define the Bokeh figure
+    p = figure(title="India Map", tools="tap", width=800, height=800, x_axis_location=None, y_axis_location=None)
+    p.grid.grid_line_color = None
+
+    # Create the patches representing the states
+    p.patches('xs', 'ys', fill_alpha=0.7, line_color='black', fill_color='Color', line_width=0.5, source=geo_source)
 
     # Initialize the game state
     state_list = [feature['properties']['NAME_1'] for feature in geojson_data['features']]
@@ -86,8 +77,12 @@ def generate_bokeh_game():
     tap_tool = TapTool(callback=tap_callback)
     p.add_tools(tap_tool)
 
+    # Layout of the HTML page
+    layout = column(p)
+
+    # Output the plot to an HTML file
     output_file(GAME_HTML)
-    save(p)
+    save(layout)  # Save the layout as an HTML file
 
 # Streamlit UI
 st.title("India States/UTs Identification Game")
@@ -96,7 +91,10 @@ st.title("India States/UTs Identification Game")
 generate_bokeh_game()
 
 # Initialize or reset the game state
-reset_game()
+state_list = []
+random_state = ""
+start_time = 0
+score = 0
 
 # Embed the Bokeh-generated HTML game as an iframe
 if os.path.exists(GAME_HTML):
@@ -122,14 +120,13 @@ if selected_state:
             save_time("Player", elapsed_time)
             st.success(f"Congratulations! You've found all the states/UTs in {elapsed_time:.2f} seconds!")
             st.write(f"Final Score: {score}")
-            st.session_state.start_time = None  # Reset for the next game
-            st.stop()
+            st.stop()  # End the game
     else:
         st.error(f"Wrong! That was {selected_state}. Try another one.")
 
 # Display time elapsed
-if "start_time" in st.session_state and st.session_state.start_time is not None:
-    elapsed_time = time.time() - st.session_state.start_time
+if start_time > 0:
+    elapsed_time = time.time() - start_time
     st.write(f"Time Elapsed: {elapsed_time:.2f} seconds")
     st.write(f"Score: {score}")
 
@@ -139,5 +136,5 @@ st.text(show_leaderboard())
 
 # Restart game option
 if st.button("Restart Game"):
-    reset_game()
+    generate_bokeh_game()  # Regenerate the game
     st.experimental_rerun()
