@@ -1,4 +1,4 @@
 geopandas
 matplotlib
 streamlit
-fiona
+plotly
