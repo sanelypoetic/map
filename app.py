@@ -1,57 +1,65 @@
 import streamlit as st
 import geopandas as gpd
-import matplotlib.pyplot as plt
+import plotly.express as px
 import random
 import time
 
 @st.cache_data
 def load_india_shapefile():
-
-    gdf = gpd.read_file('India_State_Boundary.shp', engine='fiona')
+    gdf = gpd.read_file('India_State_Boundary.shp')
     return gdf
 
-def draw_map(gdf, correct=None):
-    fig, ax = plt.subplots(figsize=(10, 10))
-    gdf.boundary.plot(ax=ax, linewidth=1)
+def plot_map(gdf, correct_state=None):
+    # Plot the map using Plotly
+    fig = px.choropleth(gdf,
+                        geojson=gdf.geometry,
+                        locations=gdf.index,
+                        color=gdf['NAME_1'].apply(lambda x: 'Correct' if x == correct_state else 'State/UT'),
+                        hover_name=gdf['NAME_1'],
+                        hover_data={'NAME_1': False})
     
-    if correct:
-        gdf.loc[gdf['NAME_1'] == correct, 'geometry'].plot(ax=ax, color='white')
+    fig.update_geos(fitbounds="locations", visible=False)
+    fig.update_layout(height=600, margin={"r":0,"t":0,"l":0,"b":0})
     
-    plt.axis('off')
-    st.pyplot(fig)
+    return fig
 
+# Load the shapefile data
 gdf = load_india_shapefile()
 
+# Initialize game variables
 score = 0
 start_time = time.time()
 
+# Get a randomized list of states/UTs
 states_list = gdf['NAME_1'].tolist()
 random.shuffle(states_list)
 
+# Main game loop
 for state in states_list:
     st.write(f"Locate the state/union territory: **{state}**")
     
-    draw_map(gdf)
+    fig = plot_map(gdf)
+    selected_state = None
     
-    st.write("Click on the map where you think the state/UT is located:")
-    click = st.pyplot_click()
+    # Show the map and get user click
+    clicked = st.plotly_chart(fig, use_container_width=True)
     
-    clicked_state = None
-    for idx, row in gdf.iterrows():
-        if row['geometry'].contains(gpd.points_from_xy([click.x], [click.y])[0]):
-            clicked_state = row['NAME_1']
-            break
+    # Placeholder to simulate state selection
+    clicked_state = st.selectbox("Choose the state/UT you clicked on:", gdf['NAME_1'].tolist())
     
     if clicked_state == state:
         st.write("Correct!")
         score += 1
-        draw_map(gdf, correct=state)
+        fig = plot_map(gdf, correct_state=state)
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        st.write(f"Wrong! You clicked on {clicked_state if clicked_state else 'an empty area'}")
-        draw_map(gdf)
+        st.write(f"Wrong! You selected {clicked_state} instead of {state}.")
+        fig = plot_map(gdf)
+        st.plotly_chart(fig, use_container_width=True)
 
 end_time = time.time()
 total_time = end_time - start_time
 
+# Display the final score and time taken
 st.write(f"Game over! Your score: {score}/{len(states_list)}")
 st.write(f"Time taken: {total_time:.2f} seconds")
