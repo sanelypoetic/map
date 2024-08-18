@@ -7,7 +7,7 @@ import time
 @st.cache_data
 def load_india_shapefile():
 
-    gdf = gpd.read_file('India_State_Boundary.shp')
+    gdf = gpd.read_file('India_State_Boundary.shp', engine='fiona')
     return gdf
 
 def draw_map(gdf, correct=None):
@@ -55,4 +55,3 @@ total_time = end_time - start_time
 
 st.write(f"Game over! Your score: {score}/{len(states_list)}")
 st.write(f"Time taken: {total_time:.2f} seconds")
-
